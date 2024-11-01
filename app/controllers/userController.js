@@ -1,5 +1,5 @@
-const User = require('../models/user'); // Importer le modèle User
-const Role = require('../models/role'); // Importer le modèle Role
+const User = require('../models/user');
+const Role = require('../models/role');
 const hashPassword = require('../middlewares/hashPassword');
 const passwordValidator = require('../middlewares/passwordValidator');
 

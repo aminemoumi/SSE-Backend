@@ -1,4 +1,4 @@
-const jwt = require('jsonwebtoken');
+import jwt from 'jsonwebtoken';
 
 // Jeton JWT à vérifier
 const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsInVzZXJSb2xlIjoidXNlciIsImlhdCI6MTcwNzkwMDYzOH0.YQEojfrBZVHx7Fcp8DGy5OAySDzOXVN3HBZsD5bi1_Y';
