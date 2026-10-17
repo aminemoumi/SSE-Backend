@@ -14,7 +14,8 @@ const userController = {
         include :[
           {model: Role,
             as : 'role'}
-        ]
+        ],
+        attributes: { exclude: ['password'] } // Exclure le mot de passe de la réponse
       });
       res.json(users);
     } catch (error) {
@@ -39,7 +40,9 @@ const userController = {
         include :[
           {model: Role,
             as : 'role'}
-        ]});
+        ],
+        attributes: { exclude: ['password'] } // Exclure le mot de passe de la réponse
+      });
       if (! user) { // si n'existe pas => 404
         res.status(404).json({ error: "User not found. Please verify the provided id." });
         return; // On arrête la fonction avec return
