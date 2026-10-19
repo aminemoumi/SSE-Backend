@@ -43,7 +43,16 @@ const User = sequelize.define('User', {
   }
 }, {
   tableName: 'user',
-  timestamps: false
+  timestamps: false,
+  defaultScope: {
+    attributes: { exclude: ['password'] }
+  }
 });
+
+User.prototype.toJSON = function toJSON() {
+  const values = { ...this.get() };
+  delete values.password;
+  return values;
+};
 
 module.exports = User;

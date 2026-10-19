@@ -3,7 +3,6 @@ const bcrypt = require('bcrypt');
 const { User, Role } = require('../models/associations');
 
 const generateAuthToken = (userId, userRole) => {
-  console.log('Generating token with:', { userId, userRole, secret: process.env.JWT_SECRET });
   return jwt.sign({ userId, userRole }, process.env.JWT_SECRET);
 };
 
@@ -14,23 +13,19 @@ const authController = {
   },
 
   login: async (req, res) => {
-    console.log('Login attempt with:', req.body);
     const { email, password } = req.body;
 
     try {
-      const user = await User.findOne({ 
+      const user = await User.unscoped().findOne({ 
         where: { email },
         include: [{ model: Role, as: 'role', attributes: ['title'] }]
       });
-      
-      console.log('User found:', user ? user.toJSON() : null);
 
       if (!user) {
         return res.status(401).json({ message: 'Invalid email or password' });
       }
 
       const passwordMatch = await bcrypt.compare(password, user.password);
-      console.log('Password match:', passwordMatch);
       
       if (!passwordMatch) {
         return res.status(401).json({ message: 'Invalid email or password' });
@@ -41,7 +36,6 @@ const authController = {
       }
 
       const userRole = user.role.title;
-      console.log('User role:', userRole);
 
       if (userRole === 'admin') {
         user.password_changed = true;
@@ -52,7 +46,6 @@ const authController = {
       }
 
       const authToken = generateAuthToken(user.id, userRole);
-      console.log('Generated token:', authToken);
       
       res.status(200).json({ message: 'connexion réussie', authToken }); 
     } catch (error) {

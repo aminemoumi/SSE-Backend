@@ -78,7 +78,7 @@ const userController = {
           }
           const hashedPassword = req.hashedPassword;
 
-          const newUser = await User.create({
+          const createdUser = await User.create({
             enterprise,
             email,
             firstname,
@@ -89,7 +89,10 @@ const userController = {
             roleId
           });
 
-          // res.status(201).json(newUser);
+          const newUser = await User.findByPk(createdUser.id, {
+            include: [{ model: Role, as: 'role' }]
+          });
+
           res.status(200).json({ message: 'Utilisateur créé avec succès', newUser });
         });
       });
@@ -105,7 +108,7 @@ const userController = {
   updateUser : async (req, res) => {
     try {
       const userId = parseInt(req.params.id);
-      const { enterprise, email, firstname, lastname, password, position, process, roleId } = req.body;
+      const { enterprise, email, firstname, lastname, position, process, roleId } = req.body;
 
       if(isNaN(userId)) { // On vérifie les user inputs
         res.status(400).json({ error: "Invalid user ID. Please verify the provided id." });
@@ -118,19 +121,27 @@ const userController = {
         return; 
       }
 
-      // Update the user
-      user.enterprise = enterprise;
-      user.email = email;
-      user.firstname = firstname;
-      user.lastname = lastname;
-      user.password = password;
-      user.position = position;
-      user.process = process;
-      user.roleId = roleId;
+      // Ne pas écraser le mot de passe : le changement se fait via /change-password/:id
+      if (enterprise !== undefined) user.enterprise = enterprise;
+      if (email !== undefined) user.email = email;
+      if (firstname !== undefined) user.firstname = firstname;
+      if (lastname !== undefined) user.lastname = lastname;
+      if (position !== undefined) user.position = position;
+      if (process !== undefined) user.process = process;
+
+      const nextRoleId = roleId ?? req.body.role_id;
+      if (nextRoleId !== undefined && nextRoleId !== null && nextRoleId !== '') {
+        user.roleId = parseInt(nextRoleId);
+      }
 
       await user.save();
 
-      res.json(user); // si l'utilisateur existe => on le retourne
+      const updatedUser = await User.findByPk(userId, {
+        include: [{ model: Role, as: 'role' }],
+        attributes: { exclude: ['password'] }
+      });
+
+      res.json(updatedUser);
 
     } catch (error) {
       console.error(error);
@@ -140,23 +151,55 @@ const userController = {
 
   // -----------------------------------------------------------------------------------
   // --------------------------------------------------------------------------------
-  // Logique pour supprimer un utilisateur: on ne peut pas supprimer un utilisateu qui a déjà enregistré un évènement.,
-  // nous devons garder la traçabilité des personnes qui ont enregistré les évènements, 
-  // il faut passer l'utilisateur en visiteur 
+  // Logique pour supprimer un utilisateur: on ne peut pas supprimer un utilisateur qui a déjà enregistré un évènement.
+  // Nous devons garder la traçabilité des personnes qui ont enregistré les évènements,
+  // il faut passer l'utilisateur en visiteur.
   deleteUser : async (req, res) => {
     try {
       const userId = req.params.id;
         
-      const user = await User.findByPk(userId);
+      const user = await User.findByPk(userId, {
+        include: [
+          { model: Role, as: 'role' },
+          { association: 'statements' }
+        ]
+      });
       if (! user) {
         return res.status(404).json({ error: "User not found. Please verify the provided id." });
       }
-      
-      // Suppression de l'utilisateur, mise à jour de la base de donnée
+
+      const hasStatements = Array.isArray(user.statements) && user.statements.length > 0;
+
+      if (hasStatements) {
+        const visitorRole = await Role.findOne({ where: { title: 'visitor' } });
+        if (!visitorRole) {
+          return res.status(500).json({ message: 'Rôle visiteur introuvable.' });
+        }
+
+        if (user.roleId === visitorRole.id) {
+          return res.status(400).json({
+            error: "Impossible de supprimer cet utilisateur : il a déjà enregistré des événements."
+          });
+        }
+
+        user.roleId = visitorRole.id;
+        await user.save();
+
+        const updatedUser = await User.findByPk(userId, {
+          include: [{ model: Role, as: 'role' }],
+          attributes: { exclude: ['password'] }
+        });
+
+        return res.status(200).json({
+          deactivated: true,
+          message: "Cet utilisateur a déjà enregistré des événements. Il a été passé en visiteur pour conserver la traçabilité.",
+          user: updatedUser
+        });
+      }
+
       await user.destroy();
       
-      // Return response
-      return res.status(200).json({ message: "L'utilisateur a été supprimé avec succès" });
+      return res.status(200).json({ deleted: true, message: "L'utilisateur a été supprimé avec succès" });
 
     }  catch (error) {
       console.error(error);
@@ -172,7 +215,7 @@ const userController = {
       hashPassword(req, res, async () => {
         
         // Récupérer l'utilisateur à partir de la base de données
-        const user = await User.findByPk(id);
+        const user = await User.unscoped().findByPk(id);
   
         if (!user) {
           return res.status(404).json({ error: 'Utilisateur non trouvé' });

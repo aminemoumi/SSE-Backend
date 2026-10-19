@@ -1,6 +1,15 @@
 const User = require('../models/user');
 const Event = require('../models/event.js');
 
+const isAdmin = (req) => req.user?.userRole === 'admin';
+
+const canManageEvent = (req, event) => {
+  if (isAdmin(req)) {
+    return true;
+  }
+  return Number(event.user_id) === Number(req.user.userId);
+};
+
 const eventController = {
   getEventPage: async (req, res) => {
     try {
@@ -110,26 +119,24 @@ const eventController = {
         return res.status(404).json({ error: "Event not found" });
       }
 
-      const updatedEvent = await Event.update({
+      if (!canManageEvent(req, eventToModify)) {
+        return res.status(403).json({ error: "Vous ne pouvez modifier que vos propres événements." });
+      }
+
+      await eventToModify.update({
         site_name: body.site_name || eventToModify.site_name,
         site_number: body.site_number || eventToModify.site_number,
         site_town: body.site_town || eventToModify.site_town,
         witness: body.witness || eventToModify.witness,
         event_description: body.event_description || eventToModify.event_description,
-        info_sse_description: body.info_sse_description || eventToModify.info_sse_description,
-        user_id: body.user_id
-      },
-      {
-        where: {
-          id: eventId
-        }
+        info_sse_description: body.info_sse_description || eventToModify.info_sse_description
       });
 
-      if (updatedEvent[0] === 1) {
-        res.json({ message: "L'événement a été mis à jour avec succès" });
-      } else {
-        res.status(404).json({ error: "L'événement n'a pas été trouvé ou n'a pas été mis à jour" });
-      }
+      const updatedEvent = await Event.findByPk(eventId, {
+        include: [{ model: User, as: 'user' }]
+      });
+
+      res.json(updatedEvent);
     } catch (error) {
       console.error(error);
       res.status(500).json({ message: 'Server error' });
@@ -145,6 +152,9 @@ const eventController = {
       const event = await Event.findByPk(eventId);
       if (!event) {
         return res.status(404).json({ error: "Event not found" });
+      }
+      if (!canManageEvent(req, event)) {
+        return res.status(403).json({ error: "Vous ne pouvez supprimer que vos propres événements." });
       }
       await event.destroy();
       res.status(204).end();
