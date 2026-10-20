@@ -209,26 +209,21 @@ const userController = {
   changePassword: async (req, res) => {
     const { id } = req.params;
 
-  
     try {
-      // passer au middleware hashPassword pour hacher le nouveau mot de passe
-      hashPassword(req, res, async () => {
-        
-        // Récupérer l'utilisateur à partir de la base de données
-        const user = await User.unscoped().findByPk(id);
-  
-        if (!user) {
-          return res.status(404).json({ error: 'Utilisateur non trouvé' });
-        }
-  
-        // Mettre à jour le mot de passe de l'utilisateur avec le mot de passe hashed
-        user.password = req.hashedPassword;
-        user.password_changed = true; // Mettre à jour le statut du mot de passe changé dans la db
-        
-        await user.save();
-  
-        res.status(200).json({ message: 'Mot de passe mis à jour avec succès' });
-      });
+      // Récupérer l'utilisateur à partir de la base de données
+      const user = await User.unscoped().findByPk(id);
+
+      if (!user) {
+        return res.status(404).json({ error: 'Utilisateur non trouvé' });
+      }
+
+      // Mettre à jour le mot de passe de l'utilisateur avec le mot de passe hashed (déjà haché par le middleware)
+      user.password = req.hashedPassword;
+      user.password_changed = true; // Mettre à jour le statut du mot de passe changé dans la db
+
+      await user.save();
+
+      res.status(200).json({ message: 'Mot de passe mis à jour avec succès' });
     } catch (error) {
       console.error('Erreur lors de la modification du mot de passe:', error);
       res.status(500).json({ message: 'Erreur serveur lors de la modification du mot de passe' });

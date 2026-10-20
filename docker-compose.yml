@@ -1,0 +1,33 @@
+# Lance la base PostgreSQL et l'API : docker compose up --build
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: suivisse
+      POSTGRES_PASSWORD: suivisse
+      POSTGRES_DB: suivisse
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Les scripts .sql de ce dossier sont exécutés au premier démarrage, dans l'ordre alphabétique
+      - ./data/create.sql:/docker-entrypoint-initdb.d/1_create.sql:ro
+      - ./migrations/add_password_changed.sql:/docker-entrypoint-initdb.d/2_password_changed.sql:ro
+      - ./data/seeding.sql:/docker-entrypoint-initdb.d/3_seeding.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U suivisse"]
+      interval: 5s
+      retries: 10
+
+  api:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PORT: 4000
+      DATABASE_URL: postgres://suivisse:suivisse@db:5432/suivisse
+      JWT_SECRET: ${JWT_SECRET:?définir JWT_SECRET dans le fichier .env}
+    ports:
+      - "4000:4000"
+
+volumes:
+  pgdata:
